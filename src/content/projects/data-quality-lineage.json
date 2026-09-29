@@ -1,0 +1,161 @@
+{
+  "slug": "data-quality-lineage",
+  "order": 2,
+  "title": "AI-Assisted Data Quality and Lineage System",
+  "shortTitle": "Data Quality & Lineage",
+  "summary": "Profiling, rule checks, and drift detection across datasets, with field-level lineage and AI-written explanations that a data steward approves before any correction runs.",
+  "primaryMessage": "I use AI to assist governed data operations while keeping human control over consequential changes.",
+  "status": "unconfirmed",
+  "featured": true,
+  "categories": ["data", "responsible-ai", "mlops"],
+  "technologies": ["Python", "PostgreSQL", "Great Expectations-style rules", "OpenLineage", "FastAPI", "LLM explanations", "Docker"],
+  "sourceArchive": null,
+  "diagramFile": null,
+
+  "executive": {
+    "problem": "Bad data reaches reports and models because checks are scattered, failures are hard to interpret, and nobody can quickly see which downstream tables a broken field affects.",
+    "approach": "One service profiles data, runs rules and drift checks, traces lineage down to the field, and uses a language model to explain each failure and propose a fix that a steward reviews.",
+    "impact": "Stewards see what broke, why, and what it touches in one place, and every correction has an approver and an audit record.",
+    "whyItMatters": "Shows how to apply AI inside governed data operations: the model drafts explanations and proposals, people approve changes, and the system keeps the record."
+  },
+
+  "problem": "Data teams find quality issues late, often from a business user. Rule failures arrive as cryptic messages, lineage lives in people's heads, and fixes are applied by hand without a record of who approved them. Regulated environments need both speed and an audit trail.",
+  "users": [
+    "Data stewards who own quality for a domain",
+    "Data engineers who maintain pipelines",
+    "Analysts and model owners who consume the data",
+    "Governance and audit teams"
+  ],
+  "constraints": [
+    { "kind": "Governance", "detail": "No automated change to production data without a named approver." },
+    { "kind": "Privacy", "detail": "Explanations are generated from profiles and samples with sensitive fields masked." },
+    { "kind": "Reliability", "detail": "Checks must run on schedule and on pipeline completion without blocking ingestion." },
+    { "kind": "Auditability", "detail": "Findings, proposals, approvals, and applied changes are stored immutably." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Sources", "nodes": [
+        { "id": "wh", "label": "Warehouse tables" },
+        { "id": "files", "label": "Batch files" },
+        { "id": "runs", "label": "Pipeline run events" }
+      ]},
+      { "title": "Checks", "nodes": [
+        { "id": "profile", "label": "Profiler", "sub": "stats, nulls, cardinality" },
+        { "id": "rules", "label": "Rule & schema validator" },
+        { "id": "drift", "label": "Drift & anomaly detector" }
+      ]},
+      { "title": "Metadata", "nodes": [
+        { "id": "lineage", "label": "Lineage graph", "sub": "dataset + field" },
+        { "id": "findings", "label": "Findings store" },
+        { "id": "audit", "label": "Audit log", "sub": "append-only" }
+      ]},
+      { "title": "AI assist", "nodes": [
+        { "id": "explain", "label": "LLM explainer", "sub": "masked context" },
+        { "id": "propose", "label": "Fix proposer" }
+      ]},
+      { "title": "Governance", "nodes": [
+        { "id": "queue", "label": "Steward review queue" },
+        { "id": "apply", "label": "Approved change runner" },
+        { "id": "notify", "label": "Notifications" }
+      ]}
+    ],
+    "edges": [
+      ["wh", "profile"], ["files", "rules"], ["runs", "drift"],
+      ["wh", "rules"], ["profile", "findings"], ["rules", "findings"], ["drift", "findings"],
+      ["runs", "lineage"],
+      ["findings", "explain"], ["lineage", "explain"],
+      ["explain", "propose"], ["propose", "queue"],
+      ["queue", "apply"], ["queue", "notify"], ["apply", "audit"]
+    ],
+    "zones": [
+      { "label": "Human approval boundary: nothing crosses into production without a steward", "from": 3, "to": 4 }
+    ]
+  },
+  "architectureNotes": [
+    "The model never writes to data stores. It produces an explanation and a proposed change object; only the change runner applies approved proposals.",
+    "Lineage is captured from pipeline run events so impact analysis reflects what actually ran.",
+    "Explanations receive profiles, rule definitions, and masked samples, never raw sensitive values."
+  ],
+  "aiTechnique": {
+    "choice": "Statistical and rule-based detection, with a language model used only for explanation and fix drafting.",
+    "rationale": "Detection must be deterministic and testable, so it uses rules, schema checks, and statistical drift tests. The language model adds value where people struggle: turning a failure plus lineage into a readable explanation and a candidate fix.",
+    "rejected": [
+      { "option": "LLM-based anomaly detection", "reason": "Non-deterministic, costly at scale, and hard to test; statistics do this job better." },
+      { "option": "Automatic correction", "reason": "Unacceptable in governed environments; a wrong fix silently corrupts downstream data." }
+    ]
+  },
+  "implementation": [
+    { "area": "Profiling and rules", "detail": "Column statistics, null and uniqueness rates, declarative rules, and schema contracts per dataset." },
+    { "area": "Drift", "detail": "Population stability and distribution tests against a rolling reference window; volume anomalies per run." },
+    { "area": "Lineage", "detail": "OpenLineage-compatible events stored as a dataset and field graph for upstream and downstream traversal." },
+    { "area": "API and UI", "detail": "FastAPI service for findings, proposals, and approvals; review queue for stewards." },
+    { "area": "Audit", "detail": "Append-only table recording finding, proposal, approver, decision, and applied change." },
+    { "area": "Notifications", "detail": "Routing by dataset owner with severity and affected downstream assets." },
+    { "area": "Testing", "detail": "Seeded datasets with injected defects; tests assert each defect is detected and traced." }
+  ],
+  "evaluation": {
+    "datasets": [
+      "Synthetic datasets with injected defects: nulls, duplicates, type changes, range violations, distribution shifts",
+      "Lineage fixtures with known upstream and downstream paths"
+    ],
+    "baselines": ["Rule checks without drift detection", "Explanations from rule messages alone, without an LLM"],
+    "metrics": [
+      { "name": "Defect detection recall", "status": "target", "target": "Share of injected defects detected, by defect type", "result": null, "dataset": "Injected-defect fixture set", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Rules only", "method": "Compare findings to the injection manifest", "limitation": null },
+      { "name": "False alert rate", "status": "target", "target": "Alerts on clean batches per 100 runs", "result": null, "dataset": "Clean batch replays", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Default drift thresholds", "method": "Count findings on batches with no injected defects", "limitation": null },
+      { "name": "Explanation accuracy", "status": "target", "target": "Steward rating of explanation correctness and usefulness", "result": null, "dataset": "Sampled findings", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Raw rule message", "method": "Blind steward review with a fixed rubric", "limitation": null }
+    ],
+    "regression": ["Every injected defect type must be detected on each CI run", "Lineage traversal tests on fixed graphs"],
+    "failureAnalysis": ["Missed defects grouped by type and threshold", "Explanations rated wrong are reviewed for missing context versus model error"]
+  },
+  "humanControl": [
+    { "control": "Approval gate", "detail": "Every proposed correction waits for a named steward's decision." },
+    { "control": "Audit history", "detail": "Findings, proposals, decisions, and applied changes are immutable and queryable." },
+    { "control": "Masking", "detail": "Sensitive fields are masked before any text reaches the model." },
+    { "control": "Escalation", "detail": "High-severity findings affecting many downstream assets notify owners directly." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "Detection of all injected defect types in the fixture set",
+      "Shorter steward triage time with explanations and lineage than with raw rule messages"
+    ]
+  },
+  "limitations": [
+    "Synthetic defects do not cover every real-world failure pattern.",
+    "Lineage is only as complete as the pipelines that emit events.",
+    "Explanation quality has not been measured with real stewards.",
+    "Triage-time improvement is a hypothesis until a timed study is run."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "cd data-quality-lineage",
+      "cp .env.example .env",
+      "docker compose up -d --build",
+      "docker compose exec api python -m seed --with-defects",
+      "docker compose exec api pytest tests/"
+    ],
+    "testData": "Synthetic tables generated by the seed script with a manifest of injected defects.",
+    "credentials": "Local steward and engineer demo accounts defined in .env.example.",
+    "expectedOutput": "Findings for each injected defect, lineage impact lists, and pending proposals in the review queue.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "diagram", "label": "Architecture diagram", "url": null },
+    { "kind": "tests", "label": "Injected-defect test suite", "url": null },
+    { "kind": "report", "label": "Evaluation report", "url": null },
+    { "kind": "package", "label": "Downloadable package", "url": null }
+  ],
+  "capabilities": [
+    { "name": "Data profiling", "status": "unconfirmed" },
+    { "name": "Rule and schema validation", "status": "unconfirmed" },
+    { "name": "Drift and anomaly detection", "status": "unconfirmed" },
+    { "name": "Dataset and field lineage", "status": "unconfirmed" },
+    { "name": "AI-generated explanations", "status": "unconfirmed" },
+    { "name": "Human-approved corrections", "status": "unconfirmed" },
+    { "name": "Audit history", "status": "unconfirmed" },
+    { "name": "Governance and notifications", "status": "unconfirmed" }
+  ],
+  "lifecycle": { "data": "strong", "ai": "medium", "evaluation": "strong", "operations": "strong", "governance": "strong" }
+}

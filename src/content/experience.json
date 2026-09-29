@@ -1,0 +1,13 @@
+{
+  "roles": [],
+  "rolesNote": "Add roles, employers, and dates from the résumé. Keep private employer code and customer details out.",
+  "areas": [
+    { "area": "Production software engineering", "detail": "APIs, services, and data systems built to run under load and change safely.", "projects": ["enterprise-rag", "operations-agent", "banking-application"] },
+    { "area": "AI architecture", "detail": "Choosing between RAG, agents, classical ML, and serving strategies from requirements and constraints.", "projects": ["enterprise-rag", "ml-decision-service", "uav-cyber-copilot"] },
+    { "area": "Cloud and platform engineering", "detail": "Containerized services, CI/CD, observability, and cloud deployment on AWS and Azure.", "projects": ["inference-lab", "cloud-api-platforms"] },
+    { "area": "Technical leadership", "detail": "Setting architecture direction, reviewing designs, and guiding engineers through delivery.", "projects": [] },
+    { "area": "Security and compliance", "detail": "Access control, audit trails, threat modelling, and working within regulated requirements.", "projects": ["operations-agent", "data-quality-lineage", "mortgage-decision-engine"] },
+    { "area": "Customer and stakeholder delivery", "detail": "Turning business problems into scoped systems and explaining tradeoffs to non-technical owners.", "projects": ["ml-decision-service", "productivity-copilot"] },
+    { "area": "Research and experimentation", "detail": "Doctoral research, controlled experiments, and benchmark design.", "projects": ["uav-cyber-copilot", "inference-lab"] }
+  ]
+}

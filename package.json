@@ -1,0 +1,24 @@
+{
+  "name": "ron-hoffler-ai-portfolio",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "validate": "node scripts/validate-content.mjs",
+    "validate:publish": "node scripts/validate-content.mjs --strict",
+    "manifest": "node scripts/export-manifest.mjs",
+    "check:a11y": "node scripts/check-site.mjs",
+    "check": "npm run validate && npm run build && npm run check:a11y"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "playwright": "^1.48.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.0.0",
+    "yaml": "^2.6.0"
+  }
+}

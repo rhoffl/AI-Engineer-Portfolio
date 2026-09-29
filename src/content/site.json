@@ -1,0 +1,60 @@
+{
+  "draft": true,
+  "name": "Ron Hoffler",
+  "positioning": "Senior AI Engineer and Enterprise Architect specializing in production RAG, reliable agentic systems, AI evaluation, secure cloud deployment, and applied UAV cybersecurity research.",
+  "valueProposition": [
+    "I design, build, evaluate, secure, and operate production AI systems across retrieval, agents, machine learning, data quality, model serving, and UAV cybersecurity.",
+    "Every system here ships with its evaluation method, its human-control points, and a plain statement of what it does not yet prove."
+  ],
+  "summary": "Enterprise software architect and engineer who moved from building production APIs, data platforms, and cloud services into applied AI. The work in this portfolio treats AI features as software systems: typed interfaces, explicit state, tests that gate releases, audit trails, and deployment that someone else can reproduce. Doctoral research in UAV cybersecurity supplies the differentiating thread, joining threat intelligence, streaming telemetry, and multimodal reasoning.",
+  "targetRoles": [
+    "Senior AI Engineer",
+    "AI / Enterprise Architect",
+    "Applied AI Engineer, Security",
+    "ML Platform & Inference Engineer"
+  ],
+  "location": null,
+  "workPreference": null,
+  "links": {
+    "email": null,
+    "linkedin": null,
+    "github": null,
+    "resume": null
+  },
+  "strongestProjects": ["enterprise-rag", "operations-agent", "uav-cyber-copilot"],
+  "pillars": [
+    {
+      "id": "context",
+      "name": "Context",
+      "headline": "Getting the right evidence in front of a model, with provenance.",
+      "evidence": ["RAG", "GraphRAG", "Hybrid retrieval (BM25 + pgvector)", "Reranking", "Memory", "Citations and abstention"],
+      "projects": ["enterprise-rag", "uav-cyber-copilot", "data-quality-lineage"]
+    },
+    {
+      "id": "agents",
+      "name": "Agents",
+      "headline": "Agents as controlled software, not open-ended prompts.",
+      "evidence": ["State machines", "Typed tools", "MCP", "Retries and idempotency", "Human approval", "Task evaluation"],
+      "projects": ["operations-agent", "uav-cyber-copilot"]
+    },
+    {
+      "id": "operations",
+      "name": "Operations",
+      "headline": "Running models and pipelines under real latency, cost, and drift.",
+      "evidence": ["Docker", "Kubernetes", "CI/CD", "Monitoring", "Drift detection", "Inference performance"],
+      "projects": ["inference-lab", "ml-decision-service", "enterprise-rag"]
+    },
+    {
+      "id": "trust",
+      "name": "Trust",
+      "headline": "Security, provenance, and a human in the loop where it matters.",
+      "evidence": ["Security controls", "Provenance", "Auditability", "Access control", "Human oversight"],
+      "projects": ["data-quality-lineage", "operations-agent", "uav-cyber-copilot"]
+    }
+  ],
+  "supportingSkills": [
+    "Python", ".NET / C#", "SQL", "TypeScript", "AWS", "Azure", "PostgreSQL", "pgvector", "FastAPI",
+    "React / Next.js", "MLflow", "PyTorch", "scikit-learn", "Docker", "Kubernetes", "GitHub Actions",
+    "OpenTelemetry", "Prometheus / Grafana", "Kafka", "Neo4j"
+  ]
+}

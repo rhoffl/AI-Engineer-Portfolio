@@ -1,0 +1,40 @@
+{
+  "title": "Doctoral research: UAV cybersecurity",
+  "status": null,
+  "statusNote": "State precisely, e.g. doctoral candidate, dissertation in progress, defended (year), or published (venue). Do not describe unpublished work as published.",
+  "institution": null,
+  "draftWording": true,
+  "question": "How can structured threat intelligence, extended for unmanned aerial systems, be combined with streaming telemetry and network evidence to detect and explain cyberattacks against UAV operations?",
+  "environment": [
+    "Software-in-the-loop flight stack (ArduPilot or PX4) with a ground control station",
+    "Simulated network carrying MAVLink traffic, monitored by Suricata and Zeek",
+    "Scripted attack injection with recorded ground truth"
+  ],
+  "architecture": [
+    "STIX 2.1 objects for UAV assets, observables, indicators, and attack patterns",
+    "Knowledge graph linking intelligence objects, detections, and ATT&CK techniques",
+    "Streaming detectors that emit graph-linked findings"
+  ],
+  "methodology": [
+    "Define attack scenarios such as GPS spoofing, MAVLink command injection, and telemetry disruption",
+    "Run each scenario and matched benign flights in simulation",
+    "Score detection and attribution against injector ground truth"
+  ],
+  "stix": [
+    "Custom STIX extensions for UAV-specific assets and telemetry observables",
+    "Mapping of UAV attack behaviors to MITRE ATT&CK techniques, noting gaps where no technique fits"
+  ],
+  "measures": [
+    "Detection rate and false positives per flight hour",
+    "Technique-mapping accuracy",
+    "Evidence support for generated findings",
+    "Analyst investigation time (planned study)"
+  ],
+  "publications": [],
+  "interests": [
+    "Threat intelligence for cyber-physical and autonomous systems",
+    "Evaluation methods for agentic and retrieval systems",
+    "Multimodal evidence fusion for security investigations",
+    "Provenance and auditability in AI-assisted decisions"
+  ]
+}

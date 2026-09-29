@@ -1,0 +1,178 @@
+{
+  "slug": "enterprise-rag",
+  "order": 1,
+  "title": "Enterprise RAG Evaluation Platform",
+  "shortTitle": "Enterprise RAG",
+  "summary": "Hybrid retrieval over access-controlled enterprise documents, with citations, abstention, and a golden-dataset evaluation harness that gates every release in CI.",
+  "primaryMessage": "I can build grounded, measurable enterprise retrieval systems, not chatbot demonstrations.",
+  "status": "implemented",
+  "featured": true,
+  "categories": ["rag", "mlops", "responsible-ai"],
+  "technologies": ["Python", "FastAPI", "PostgreSQL", "pgvector", "BM25", "Cross-encoder reranker", "Docker", "GitHub Actions"],
+  "sourceArchive": "enterprise-rag-platform.zip",
+  "diagramFile": "enterprise-rag-workflow.drawio",
+
+  "executive": {
+    "problem": "Employees lose time searching policies, manuals, and tickets, and generic chatbots answer confidently from documents the user should not see or from no document at all.",
+    "approach": "A retrieval service that combines keyword and vector search, reranks results, answers only with citations to documents the user is allowed to read, and says \"I don't know\" when the evidence is thin.",
+    "impact": "Answers can be traced to a source paragraph, access rules are enforced before generation, and retrieval quality is measured against a reviewed question set on every change.",
+    "whyItMatters": "This is the pattern most enterprise AI programs need first. It shows retrieval engineering, access control, and evaluation discipline together rather than a prompt wrapped in a UI."
+  },
+
+  "problem": "Knowledge is spread across PDFs, wikis, and ticket systems with different owners and permissions. A useful assistant must find the right passage, respect who may see it, cite it, and refuse when nothing supports an answer. Without measurement, teams cannot tell whether a prompt or index change helped or hurt.",
+  "users": [
+    "Employees asking policy and procedure questions",
+    "Support engineers searching manuals and past tickets",
+    "Knowledge owners who maintain source documents",
+    "Platform engineers who own retrieval quality and releases"
+  ],
+  "constraints": [
+    { "kind": "Security", "detail": "Document-level access control applied at retrieval time, before any text reaches the model." },
+    { "kind": "Grounding", "detail": "Every answer sentence must map to a cited chunk; unsupported questions return an abstention." },
+    { "kind": "Latency", "detail": "Interactive response target of a few seconds end to end, including reranking." },
+    { "kind": "Cost", "detail": "Reranking and generation limited to a small candidate set per query." },
+    { "kind": "Governance", "detail": "Ingestion records source, version, and owner for each chunk so answers can be audited." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Sources", "nodes": [
+        { "id": "src-pdf", "label": "Policy PDFs" },
+        { "id": "src-wiki", "label": "Wikis & manuals" },
+        { "id": "src-tix", "label": "Ticket exports" }
+      ]},
+      { "title": "Ingestion", "nodes": [
+        { "id": "parse", "label": "Parser & chunker", "sub": "layout-aware" },
+        { "id": "acl", "label": "ACL tagger", "sub": "owner, groups" },
+        { "id": "embed", "label": "Embedder" }
+      ]},
+      { "title": "Storage", "nodes": [
+        { "id": "pg", "label": "Postgres + pgvector" },
+        { "id": "bm25", "label": "BM25 index" },
+        { "id": "acltbl", "label": "Document ACL table" }
+      ]},
+      { "title": "Retrieve & answer", "nodes": [
+        { "id": "hybrid", "label": "Hybrid retriever", "sub": "RRF fusion + ACL filter" },
+        { "id": "rerank", "label": "Reranker", "sub": "cross-encoder" },
+        { "id": "gen", "label": "Grounded generator", "sub": "cite or abstain" }
+      ]},
+      { "title": "Serve & evaluate", "nodes": [
+        { "id": "api", "label": "FastAPI /ask", "sub": "SSO identity" },
+        { "id": "eval", "label": "Golden-set harness" },
+        { "id": "ci", "label": "CI regression gate" }
+      ]}
+    ],
+    "edges": [
+      ["src-pdf", "parse"], ["src-wiki", "parse"], ["src-tix", "parse"],
+      ["parse", "acl"], ["parse", "embed"],
+      ["embed", "pg"], ["parse", "bm25"], ["acl", "acltbl"],
+      ["pg", "hybrid"], ["bm25", "hybrid"], ["acltbl", "hybrid"],
+      ["hybrid", "rerank"], ["rerank", "gen"],
+      ["gen", "api"], ["gen", "eval"], ["eval", "ci"]
+    ],
+    "zones": [
+      { "label": "Private network: documents never leave this boundary unfiltered", "from": 1, "to": 3 }
+    ]
+  },
+  "architectureNotes": [
+    "Access filtering happens inside the retriever query, so a document the caller cannot read is never a candidate for reranking or generation.",
+    "Keyword and vector results are merged with reciprocal rank fusion; neither ranker alone decides what the model sees.",
+    "The generator receives numbered chunks and must reference chunk IDs; a post-check drops sentences without a valid citation.",
+    "The evaluation harness calls the same /ask endpoint the UI uses, so CI measures the deployed path, not a notebook copy."
+  ],
+  "aiTechnique": {
+    "choice": "Retrieval-augmented generation with hybrid retrieval, reranking, and enforced citation.",
+    "rationale": "Enterprise answers must be current, attributable, and permission-aware. RAG keeps knowledge in documents that owners already maintain, and hybrid retrieval handles both exact terms (policy numbers, part codes) and paraphrased questions.",
+    "rejected": [
+      { "option": "Fine-tuning on the document corpus", "reason": "Cannot enforce per-user permissions, cannot cite, and goes stale when documents change." },
+      { "option": "Vector search only", "reason": "Misses exact identifiers and acronyms that BM25 matches reliably." },
+      { "option": "Long-context stuffing", "reason": "Higher cost per query and no access control at the passage level." }
+    ]
+  },
+  "implementation": [
+    { "area": "API", "detail": "FastAPI service with /ingest, /ask, and /feedback endpoints; request identity taken from the SSO token and passed to the retriever." },
+    { "area": "Storage", "detail": "PostgreSQL with pgvector for embeddings, a BM25 index for keyword search, and an ACL table joined at query time." },
+    { "area": "Retrieval", "detail": "Top-k from each ranker, reciprocal rank fusion, cross-encoder reranking of the fused list." },
+    { "area": "Generation", "detail": "Prompt with numbered chunks, citation-required output schema, and an abstention path when reranker scores fall below a threshold." },
+    { "area": "Containers", "detail": "docker-compose stack for API, database, and evaluation runner." },
+    { "area": "CI/CD", "detail": "GitHub Actions runs unit tests, an integration test of hybrid retrieval, and the golden-set evaluation; a drop below threshold fails the build." },
+    { "area": "Observability", "detail": "Per-request trace of retrieved IDs, scores, citations, and latency by stage." },
+    { "area": "Security", "detail": "No document text in logs, secrets through environment variables, ACL checks covered by tests." }
+  ],
+  "evaluation": {
+    "datasets": [
+      "Golden question set with manually reviewed answers and the chunk IDs that support them",
+      "Unanswerable questions to test abstention",
+      "Permission probes: questions whose only evidence is in documents the test user cannot read"
+    ],
+    "baselines": ["BM25 only", "pgvector only", "Hybrid without reranker"],
+    "metrics": [
+      { "name": "Recall@5", "status": "target", "target": "Report against BM25-only and vector-only baselines", "result": null, "dataset": "Golden question set (size to be fixed at first run)", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "BM25 only; pgvector only", "method": "Share of questions where a reviewed supporting chunk appears in the top 5 after reranking", "limitation": null },
+      { "name": "Citation correctness", "status": "target", "target": "Share of cited chunks that support the sentence citing them", "result": null, "dataset": "Golden question set", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Hybrid without reranker", "method": "Reviewer or judge-model check of each citation against its sentence, with reviewer spot-checks of the judge", "limitation": null },
+      { "name": "Grounded answer rate", "status": "target", "target": "Share of answers where every sentence carries a valid citation", "result": null, "dataset": "Golden question set", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Generator without citation post-check", "method": "Automated citation parse plus support check", "limitation": null },
+      { "name": "Correct abstention rate", "status": "target", "target": "Share of unanswerable questions that return an abstention", "result": null, "dataset": "Unanswerable question subset", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "No abstention threshold", "method": "Exact match on abstention response", "limitation": null }
+    ],
+    "regression": [
+      "CI fails when Recall@5 or grounded answer rate drops below the stored threshold",
+      "Permission probes must return zero leaked chunks on every run",
+      "Stage latency recorded per run to catch reranker slowdowns"
+    ],
+    "failureAnalysis": [
+      "Misses grouped by cause: chunking split the answer, vocabulary mismatch, stale document, or reranker demotion",
+      "Wrong citations reviewed to separate retrieval errors from generation errors"
+    ]
+  },
+  "humanControl": [
+    { "control": "Access control", "detail": "Document permissions come from the source systems and are enforced in the retrieval query." },
+    { "control": "Abstention", "detail": "Low-evidence questions return a refusal with the closest sources instead of a guess." },
+    { "control": "Feedback", "detail": "Users flag wrong answers; flagged items are reviewed and can be added to the golden set." },
+    { "control": "Audit log", "detail": "Each answer stores the question, user, retrieved IDs, citations, and model version." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "Hybrid retrieval with reranking outperforms either single ranker on Recall@5",
+      "Abstention reduces unsupported answers on the unanswerable subset",
+      "Zero permission leaks across all probe questions"
+    ]
+  },
+  "limitations": [
+    "Evaluation quality depends on the size and review quality of the golden set.",
+    "Judge-model scoring of citations needs periodic human calibration.",
+    "Does not prove performance at large corpus scale or under heavy concurrency.",
+    "Tables and scanned images are only as good as the parser that extracts them."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "unzip enterprise-rag-platform.zip && cd enterprise-rag-platform",
+      "cp .env.example .env    # add a model API key or point to a local model",
+      "docker compose up -d --build",
+      "docker compose exec api python -m app.ingest --path data/sample",
+      "docker compose exec api python -m evaluation.run --dataset evaluation/golden.jsonl"
+    ],
+    "testData": "Public sample documents and a small reviewed question set under data/sample and evaluation/.",
+    "credentials": "Two seeded local demo users with different document permissions; values are in .env.example and work only on localhost.",
+    "expectedOutput": "An evaluation report in evaluation/reports/ with Recall@5, citation correctness, grounded answer rate, and abstention rate per baseline.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "diagram", "label": "enterprise-rag-workflow.drawio", "url": null },
+    { "kind": "tests", "label": "Hybrid retrieval integration test", "url": null },
+    { "kind": "report", "label": "Evaluation report", "url": null },
+    { "kind": "demo", "label": "Recorded demo", "url": null },
+    { "kind": "package", "label": "enterprise-rag-platform.zip", "url": null }
+  ],
+  "capabilities": [
+    { "name": "Document ingestion", "status": "implemented" },
+    { "name": "pgvector and BM25 retrieval", "status": "implemented" },
+    { "name": "Hybrid search", "status": "implemented" },
+    { "name": "Reranking", "status": "unconfirmed" },
+    { "name": "Citations and abstention", "status": "unconfirmed" },
+    { "name": "Role-based document access", "status": "unconfirmed" },
+    { "name": "Golden-dataset evaluation", "status": "unconfirmed" },
+    { "name": "Retrieval and generation metrics", "status": "planned" },
+    { "name": "Docker and CI regression testing", "status": "unconfirmed" }
+  ],
+  "lifecycle": { "data": "strong", "ai": "strong", "evaluation": "strong", "operations": "strong", "governance": "strong" }
+}

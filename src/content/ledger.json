@@ -1,0 +1,12 @@
+[
+  { "id": "rag-hybrid", "claim": "Enterprise RAG platform supports hybrid retrieval", "project": "enterprise-rag", "evidence": "Source code and hybrid retrieval integration test", "status": "verified", "note": "Link the test file before publishing." },
+  { "id": "agent-approval", "claim": "Operations agent requires approval before change actions", "project": "operations-agent", "evidence": "State-machine test", "status": "verified", "note": "Link the test file before publishing." },
+  { "id": "rag-metrics", "claim": "RAG retrieval quality (Recall@5, citation correctness, grounded answer rate)", "project": "enterprise-rag", "evidence": "Golden-set evaluation report", "status": "pending", "note": "No benchmark run recorded yet." },
+  { "id": "uav-time", "claim": "UAV copilot reduces investigation time", "project": "uav-cyber-copilot", "evidence": "Benchmark results from a timed analyst study", "status": "unverified", "note": "Unverified until measured." },
+  { "id": "lab-cost", "claim": "Selected model configuration lowers serving cost", "project": "inference-lab", "evidence": "Performance-lab report", "status": "pending" },
+  { "id": "lab-32k", "claim": "System supports 32K context", "project": "inference-lab", "evidence": "Runtime experiment", "status": "pending" },
+  { "id": "dq-detect", "claim": "Data quality system detects all injected defect types", "project": "data-quality-lineage", "evidence": "Injected-defect test suite", "status": "pending" },
+  { "id": "ml-cost", "claim": "Capacity-based threshold lowers expected cost vs default threshold", "project": "ml-decision-service", "evidence": "Evaluation report with stated cost assumptions", "status": "pending" },
+  { "id": "agent-injection", "claim": "Operations agent resists prompt injection in tool output", "project": "operations-agent", "evidence": "Adversarial scenario results", "status": "pending" },
+  { "id": "uav-sim", "claim": "UAV copilot is a research and simulation environment only", "project": "uav-cyber-copilot", "evidence": "Scope statement in README, reports, and UI", "status": "verified", "note": "A scope limitation, stated everywhere the project appears." }
+]

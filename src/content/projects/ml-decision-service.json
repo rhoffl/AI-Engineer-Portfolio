@@ -1,0 +1,161 @@
+{
+  "slug": "ml-decision-service",
+  "order": 4,
+  "title": "Production ML Decision Service",
+  "shortTitle": "ML Decision Service",
+  "summary": "A classical ML service that ties model quality to review capacity and financial cost: leakage checks, calibrated probabilities, cost-based thresholds, SHAP explanations, a model registry, and champion/challenger deployment.",
+  "primaryMessage": "I connect classical machine-learning performance to operational capacity and financial consequences.",
+  "status": "unconfirmed",
+  "featured": true,
+  "categories": ["ml", "mlops", "responsible-ai"],
+  "technologies": ["Python", "scikit-learn", "LightGBM", "SHAP", "MLflow", "DVC", "FastAPI", "Evidently", "Docker"],
+  "sourceArchive": null,
+  "diagramFile": null,
+
+  "executive": {
+    "problem": "A team can review only so many flagged cases per day, and each missed case or needless review has a cost. A model tuned for accuracy alone ignores both.",
+    "approach": "Train a baseline and a candidate model on versioned data, calibrate their scores, pick the decision threshold from review capacity and cost, explain each decision, and deploy the challenger beside the champion before promotion.",
+    "impact": "The operating point is chosen in business terms, every prediction can be explained, and a model change is promoted only on evidence.",
+    "whyItMatters": "Shows mature classical ML: not only a good AUC, but the calibration, thresholds, monitoring, and deployment practice that make a model safe to depend on."
+  },
+
+  "problem": "Decision models such as risk or eligibility screening fail in production for reasons that offline accuracy hides: leakage inflates validation scores, class imbalance distorts thresholds, uncalibrated scores mislead reviewers, and drift erodes performance quietly. The business needs a model whose threshold matches staffing and whose decisions can be explained to reviewers and auditors.",
+  "users": [
+    "Case reviewers who work the flagged queue",
+    "Operations managers who set review capacity",
+    "Model owners and risk or compliance reviewers"
+  ],
+  "constraints": [
+    { "kind": "Capacity", "detail": "The flagged volume must fit the daily review capacity." },
+    { "kind": "Cost", "detail": "Missed positives and unnecessary reviews carry different, explicit costs." },
+    { "kind": "Explainability", "detail": "Each decision exposes its main contributing features." },
+    { "kind": "Governance", "detail": "Datasets, models, and thresholds are versioned; promotion requires recorded evidence." },
+    { "kind": "Fairness", "detail": "Performance is reported across relevant segments before promotion." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Data", "nodes": [
+        { "id": "ds", "label": "Versioned dataset", "sub": "DVC" },
+        { "id": "feat", "label": "Feature pipeline" },
+        { "id": "leak", "label": "Leakage checks", "sub": "time split, target proxies" }
+      ]},
+      { "title": "Training", "nodes": [
+        { "id": "base", "label": "Baseline", "sub": "logistic regression" },
+        { "id": "cand", "label": "Candidate", "sub": "gradient boosting" },
+        { "id": "cv", "label": "CV + imbalance handling" },
+        { "id": "cal", "label": "Calibration + threshold", "sub": "cost & capacity" }
+      ]},
+      { "title": "Registry", "nodes": [
+        { "id": "mlflow", "label": "MLflow registry" },
+        { "id": "shap", "label": "SHAP reports" }
+      ]},
+      { "title": "Serving", "nodes": [
+        { "id": "champ", "label": "Champion API" },
+        { "id": "chall", "label": "Challenger", "sub": "shadow traffic" }
+      ]},
+      { "title": "Monitoring", "nodes": [
+        { "id": "drift", "label": "Drift monitor" },
+        { "id": "retrain", "label": "Scheduled retraining" },
+        { "id": "dash", "label": "Capacity & cost view" }
+      ]}
+    ],
+    "edges": [
+      ["ds", "feat"], ["feat", "leak"],
+      ["leak", "base"], ["leak", "cand"], ["base", "cv"], ["cand", "cv"], ["cv", "cal"],
+      ["cal", "mlflow"], ["cal", "shap"],
+      ["mlflow", "champ"], ["mlflow", "chall"],
+      ["champ", "drift"], ["chall", "dash"], ["champ", "dash"], ["drift", "retrain"]
+    ],
+    "zones": [
+      { "label": "Promotion gate: registry stage change needs recorded approval", "from": 2, "to": 3 }
+    ]
+  },
+  "architectureNotes": [
+    "The training pipeline refuses to run when leakage checks fail, such as features computed after the outcome date.",
+    "Thresholds are stored with the model version, so a model and its operating point are promoted together.",
+    "The challenger scores live traffic in shadow mode; its decisions are logged but not acted on until promotion."
+  ],
+  "aiTechnique": {
+    "choice": "Gradient-boosted trees against a logistic-regression baseline, with probability calibration and cost-based threshold selection.",
+    "rationale": "Tabular decision data is well served by boosted trees, and a linear baseline shows how much complexity buys. Calibration makes scores usable as probabilities so the threshold can be derived from costs and capacity.",
+    "rejected": [
+      { "option": "Deep learning", "reason": "No evidence of benefit on moderate-size tabular data, and harder to explain." },
+      { "option": "LLM-based scoring", "reason": "Less accurate and less stable than trained models for structured prediction, and costly per decision." },
+      { "option": "Default 0.5 threshold", "reason": "Ignores imbalance, capacity, and asymmetric error costs." }
+    ]
+  },
+  "implementation": [
+    { "area": "Data", "detail": "DVC-versioned datasets with time-based splits and automated leakage tests." },
+    { "area": "Training", "detail": "Stratified cross-validation, class weighting or resampling compared, hyperparameter search." },
+    { "area": "Calibration", "detail": "Isotonic or Platt calibration chosen by reliability on held-out data." },
+    { "area": "Thresholds", "detail": "Expected-cost curve and capacity constraint used to pick the operating point." },
+    { "area": "Registry", "detail": "MLflow tracks runs, artifacts, SHAP summaries, thresholds, and stage transitions." },
+    { "area": "Serving", "detail": "FastAPI prediction endpoint returning score, decision, and top feature contributions." },
+    { "area": "Monitoring", "detail": "Feature and prediction drift reports; scheduled retraining that registers but never auto-promotes." }
+  ],
+  "evaluation": {
+    "datasets": ["A public or synthetic tabular dataset with a realistic positive rate and a time field", "Out-of-time holdout period"],
+    "baselines": ["Logistic regression", "Default 0.5 threshold"],
+    "metrics": [
+      { "name": "PR-AUC", "status": "target", "target": "Candidate vs baseline on the out-of-time holdout", "result": null, "dataset": "Out-of-time holdout", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Logistic regression", "method": "Area under precision-recall curve", "limitation": null },
+      { "name": "Calibration error (ECE)", "status": "target", "target": "Before and after calibration", "result": null, "dataset": "Out-of-time holdout", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Uncalibrated candidate", "method": "Expected calibration error over fixed bins", "limitation": null },
+      { "name": "Expected cost at capacity", "status": "target", "target": "Cost per period at the chosen threshold vs default threshold", "result": null, "dataset": "Out-of-time holdout with stated cost assumptions", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Default 0.5 threshold", "method": "Sum of false-negative and review costs under the capacity limit", "limitation": null }
+    ],
+    "regression": ["Leakage tests on every training run", "Promotion blocked if the candidate underperforms the champion on the holdout or any monitored segment"],
+    "failureAnalysis": ["Error review by segment and by top SHAP features", "Drift episodes traced to feature sources"]
+  },
+  "humanControl": [
+    { "control": "Promotion approval", "detail": "A model owner approves registry stage changes using the recorded comparison." },
+    { "control": "Explanations", "detail": "Reviewers see the top contributing features for each flagged case." },
+    { "control": "No auto-promotion", "detail": "Retraining produces candidates; people decide what goes live." },
+    { "control": "Segment review", "detail": "Performance by segment is reviewed before promotion." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "Lower expected cost at the capacity-based threshold than at the default threshold",
+      "Improved calibration after isotonic or Platt scaling"
+    ]
+  },
+  "limitations": [
+    "Cost figures are illustrative assumptions, not a client's real economics.",
+    "Public or synthetic data does not reproduce every production pattern.",
+    "SHAP values explain the model, not causality in the world.",
+    "Segment fairness analysis is limited to fields available in the dataset."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "cd ml-decision-service",
+      "cp .env.example .env",
+      "docker compose up -d --build",
+      "docker compose exec trainer python -m pipeline.train --config configs/default.yaml",
+      "docker compose exec trainer python -m pipeline.evaluate --holdout out_of_time"
+    ],
+    "testData": "Dataset fetched or generated by data/README.md instructions and versioned with DVC.",
+    "credentials": "None required; MLflow UI runs on localhost.",
+    "expectedOutput": "MLflow runs for baseline and candidate, calibration plots, cost curve, SHAP summary, and a promotion recommendation.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "report", "label": "Model card and evaluation report", "url": null },
+    { "kind": "diagram", "label": "Architecture diagram", "url": null },
+    { "kind": "tests", "label": "Leakage and promotion tests", "url": null },
+    { "kind": "package", "label": "Downloadable package", "url": null }
+  ],
+  "capabilities": [
+    { "name": "Versioned datasets", "status": "unconfirmed" },
+    { "name": "Leakage detection", "status": "unconfirmed" },
+    { "name": "Baseline and candidate models", "status": "unconfirmed" },
+    { "name": "Cross-validation", "status": "unconfirmed" },
+    { "name": "Class-imbalance handling", "status": "unconfirmed" },
+    { "name": "SHAP explainability", "status": "unconfirmed" },
+    { "name": "Calibration and threshold selection", "status": "unconfirmed" },
+    { "name": "Model registry", "status": "unconfirmed" },
+    { "name": "Drift monitoring", "status": "unconfirmed" },
+    { "name": "Champion/challenger deployment", "status": "unconfirmed" },
+    { "name": "Scheduled retraining", "status": "unconfirmed" }
+  ],
+  "lifecycle": { "data": "strong", "ai": "strong", "evaluation": "strong", "operations": "strong", "governance": "strong" }
+}

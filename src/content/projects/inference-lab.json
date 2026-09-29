@@ -1,0 +1,146 @@
+{
+  "slug": "inference-lab",
+  "order": 6,
+  "title": "Inference Performance Lab",
+  "shortTitle": "Inference Lab",
+  "summary": "A benchmark harness that compares hosted and local inference, CPU and GPU, quantization levels, caching, batching, and speculative decoding on quality, latency, throughput, memory, and cost, then recommends a configuration for a stated workload.",
+  "primaryMessage": "I understand the operational economics of model serving and choose systems by workload constraints, not model popularity.",
+  "status": "unconfirmed",
+  "featured": true,
+  "categories": ["serving", "mlops"],
+  "technologies": ["Python", "vLLM", "llama.cpp", "Hosted model APIs", "Quantization (INT8, 4-bit)", "Prometheus", "Grafana", "Docker", "CUDA"],
+  "sourceArchive": null,
+  "diagramFile": null,
+
+  "executive": {
+    "problem": "Teams pick a model and serving setup by reputation, then discover it is too slow, too expensive, or needs hardware they do not have.",
+    "approach": "Run the same workloads across hosted and local options and serving techniques, measure quality alongside speed and cost, and select the cheapest configuration that meets the workload's targets.",
+    "impact": "Serving decisions come with numbers: latency percentiles, throughput, memory, cost per thousand requests, and quality on the task.",
+    "whyItMatters": "Shows the operational side of AI engineering that determines whether a feature is affordable and fast enough to ship."
+  },
+
+  "problem": "Model serving choices trade quality against latency, throughput, memory, and cost. Quantization saves memory but can hurt quality; batching raises throughput but can raise tail latency; long contexts change everything. Without a controlled harness, teams cannot compare options on their own workload.",
+  "users": ["AI platform engineers", "Product teams choosing a serving setup", "Finance and capacity planners"],
+  "constraints": [
+    { "kind": "Comparability", "detail": "Same prompts, same scoring, fixed seeds where possible, and recorded hardware for every run." },
+    { "kind": "Cost", "detail": "Cost modelled from hosted pricing or hardware amortization, with assumptions shown." },
+    { "kind": "Quality", "detail": "A configuration that fails the task-quality floor is rejected regardless of speed." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Workloads", "nodes": [
+        { "id": "prompts", "label": "Task prompt sets" },
+        { "id": "ctx", "label": "Context-length sweeps" },
+        { "id": "conc", "label": "Concurrency profiles" }
+      ]},
+      { "title": "Runners", "nodes": [
+        { "id": "hosted", "label": "Hosted API" },
+        { "id": "vllm", "label": "vLLM", "sub": "GPU" },
+        { "id": "llama", "label": "llama.cpp", "sub": "CPU" }
+      ]},
+      { "title": "Variants", "nodes": [
+        { "id": "quant", "label": "Quantization", "sub": "FP16 / INT8 / 4-bit" },
+        { "id": "cache", "label": "Prefix & KV caching" },
+        { "id": "spec", "label": "Speculative decoding" }
+      ]},
+      { "title": "Measurement", "nodes": [
+        { "id": "lat", "label": "Latency & throughput", "sub": "TTFT, p50, p95" },
+        { "id": "qual", "label": "Quality scorer" },
+        { "id": "mem", "label": "Memory & cost meter" }
+      ]},
+      { "title": "Decision", "nodes": [
+        { "id": "store", "label": "Results store" },
+        { "id": "select", "label": "Config selector report" }
+      ]}
+    ],
+    "edges": [
+      ["prompts", "hosted"], ["ctx", "vllm"], ["conc", "llama"], ["prompts", "vllm"],
+      ["vllm", "quant"], ["vllm", "cache"], ["vllm", "spec"], ["llama", "quant"],
+      ["hosted", "lat"], ["quant", "lat"], ["cache", "lat"], ["spec", "lat"], ["quant", "qual"], ["quant", "mem"],
+      ["lat", "store"], ["qual", "store"], ["mem", "store"], ["store", "select"]
+    ],
+    "zones": []
+  },
+  "architectureNotes": [
+    "Every run records model version, runner version, hardware, quantization, and settings, so results are comparable and repeatable.",
+    "The selector filters out configurations below the quality floor or above the latency target, then ranks the rest by cost."
+  ],
+  "aiTechnique": {
+    "choice": "Controlled benchmarking of serving methods: quantization, batching, caching, and speculative decoding across hosted and local runtimes.",
+    "rationale": "Serving methods interact with workload shape, so the only reliable way to choose is to measure on representative workloads with quality scored in the same run.",
+    "rejected": [
+      { "option": "Public leaderboards", "reason": "Measure quality on generic tasks and ignore latency, hardware, and cost for your workload." },
+      { "option": "Vendor-reported throughput", "reason": "Usually measured on favorable settings that do not match production traffic." }
+    ]
+  },
+  "implementation": [
+    { "area": "Harness", "detail": "Workload definitions in YAML; a load generator for concurrency and batch sweeps." },
+    { "area": "Runners", "detail": "Adapters for hosted APIs, vLLM on GPU, and llama.cpp on CPU behind one interface." },
+    { "area": "Metrics", "detail": "Time to first token, inter-token latency, p50/p95/p99, tokens per second, peak memory, and cost per 1K requests." },
+    { "area": "Quality", "detail": "Task-specific scorers run on the same outputs that were timed." },
+    { "area": "Observability", "detail": "Prometheus exporters and Grafana dashboards for GPU and runtime metrics." },
+    { "area": "Reporting", "detail": "Pareto charts of quality against latency and cost, and a recommended configuration per workload." }
+  ],
+  "evaluation": {
+    "datasets": ["Representative prompt sets per task", "Synthetic long-context documents for context-length scaling"],
+    "baselines": ["Hosted API at default settings", "FP16 local model without caching"],
+    "metrics": [
+      { "name": "p95 latency", "status": "target", "target": "Per configuration and concurrency level", "result": null, "dataset": "Task prompt sets", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Hosted API default", "method": "Load generator with fixed request mix", "limitation": null },
+      { "name": "Throughput (tokens/s)", "status": "target", "target": "Per configuration and batch size", "result": null, "dataset": "Task prompt sets", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "FP16 without batching", "method": "Output tokens over wall time at steady state", "limitation": null },
+      { "name": "Quality delta from quantization", "status": "target", "target": "Task score change vs FP16", "result": null, "dataset": "Task prompt sets", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "FP16", "method": "Same scorer on same prompts", "limitation": null },
+      { "name": "Cost per 1K requests", "status": "target", "target": "Per configuration", "result": null, "dataset": "Task prompt sets", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Hosted API default", "method": "Pricing or amortized hardware cost with stated assumptions", "limitation": null },
+      { "name": "Supported context length", "status": "target", "target": "e.g. 32K tokens within memory and latency limits", "result": null, "dataset": "Context-length sweep", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Default context", "method": "Runtime experiment across increasing context", "limitation": null }
+    ],
+    "regression": ["Benchmark reruns on runtime or model upgrades", "Alerts when p95 latency or quality moves outside tolerance"],
+    "failureAnalysis": ["Out-of-memory and timeout failures logged per configuration", "Quality drops traced to specific task types"]
+  },
+  "humanControl": [
+    { "control": "Stated assumptions", "detail": "Cost and hardware assumptions are shown next to every cost figure." },
+    { "control": "Recommendation review", "detail": "The selector recommends; an engineer signs off on the production configuration." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "A quantized local configuration meets the quality floor at lower cost for some workloads",
+      "Batching and caching improve throughput with a measurable tail-latency cost"
+    ]
+  },
+  "limitations": [
+    "Results apply to the hardware, versions, and workloads tested.",
+    "Cost models depend on pricing and utilization assumptions.",
+    "Does not cover multi-node serving or autoscaling behavior.",
+    "32K context support is pending a runtime experiment."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "cd inference-lab",
+      "cp .env.example .env    # hosted API keys optional",
+      "docker compose up -d --build",
+      "docker compose exec bench python -m lab.run --workload workloads/qa.yaml --runners vllm,llamacpp",
+      "docker compose exec bench python -m lab.report"
+    ],
+    "testData": "Workload YAML files and prompt sets under workloads/.",
+    "credentials": "Optional hosted API keys in .env; local runners need none.",
+    "expectedOutput": "A results table, Pareto charts, and a recommended configuration per workload.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "report", "label": "Performance-lab report", "url": null },
+    { "kind": "diagram", "label": "Harness diagram", "url": null },
+    { "kind": "package", "label": "Downloadable package", "url": null }
+  ],
+  "capabilities": [
+    { "name": "Hosted versus local inference", "status": "unconfirmed" },
+    { "name": "CPU versus GPU execution", "status": "unconfirmed" },
+    { "name": "Quantization", "status": "unconfirmed" },
+    { "name": "Batch and concurrency testing", "status": "unconfirmed" },
+    { "name": "Context-length scaling", "status": "planned" },
+    { "name": "Caching", "status": "unconfirmed" },
+    { "name": "Speculative decoding", "status": "unconfirmed" },
+    { "name": "Quality, latency, throughput, memory, and cost", "status": "unconfirmed" },
+    { "name": "Production configuration selection", "status": "unconfirmed" }
+  ],
+  "lifecycle": { "data": "medium", "ai": "strong", "evaluation": "strong", "operations": "strong", "governance": "medium" }
+}

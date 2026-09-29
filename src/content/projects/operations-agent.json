@@ -1,0 +1,166 @@
+{
+  "slug": "operations-agent",
+  "order": 3,
+  "title": "Reliable Tool-Using Operations Agent",
+  "shortTitle": "Operations Agent",
+  "summary": "An incident-response agent built as an explicit state machine with typed tools, permission tiers, prompt-injection defenses, human approval for changes, and a persistent execution history.",
+  "primaryMessage": "I engineer agents as controlled software systems, not unconstrained autonomous prompts.",
+  "status": "implemented",
+  "featured": true,
+  "categories": ["agents", "security", "responsible-ai"],
+  "technologies": ["Python", "Typed tool schemas (Pydantic)", "State machine", "MCP", "PostgreSQL", "FastAPI", "Docker", "OpenTelemetry"],
+  "sourceArchive": null,
+  "diagramFile": null,
+
+  "executive": {
+    "problem": "On-call engineers repeat the same diagnostic steps for common incidents, and fully autonomous agents are too risky to let near production systems.",
+    "approach": "An agent that follows a defined sequence of states, can call only registered tools with typed inputs, gathers diagnostics on its own, and stops for a human before any change.",
+    "impact": "Routine diagnosis is automated while every write action is approved, retried safely, and recorded.",
+    "whyItMatters": "Shows the engineering that makes agents safe to deploy: bounded behavior, permissions, idempotency, and evaluation, rather than a clever prompt."
+  },
+
+  "problem": "Incident triage involves reading alerts, querying logs and metrics, checking recent deploys, and sometimes restarting or scaling a service. Free-form agents can loop, call the wrong tool, follow instructions injected through log text, or repeat a change twice. The organization needs automation it can bound and audit.",
+  "users": [
+    "On-call engineers and SREs",
+    "Incident commanders who approve changes",
+    "Platform teams who register tools and permissions"
+  ],
+  "constraints": [
+    { "kind": "Safety", "detail": "Write actions require human approval; read actions run automatically within limits." },
+    { "kind": "Security", "detail": "Tool output such as log lines is treated as untrusted data and cannot change the agent's instructions." },
+    { "kind": "Reliability", "detail": "Every tool call has a timeout, bounded retries, and an idempotency key." },
+    { "kind": "Auditability", "detail": "Each state transition, tool call, and approval is persisted and replayable." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Triggers", "nodes": [
+        { "id": "alert", "label": "Alert / ticket" },
+        { "id": "op", "label": "Operator request" }
+      ]},
+      { "title": "Orchestration", "nodes": [
+        { "id": "sm", "label": "State machine", "sub": "triage → diagnose → propose → act → report" },
+        { "id": "policy", "label": "Policy engine", "sub": "tool permissions" },
+        { "id": "guard", "label": "Injection guard", "sub": "untrusted-content tagging" }
+      ]},
+      { "title": "Tools", "nodes": [
+        { "id": "registry", "label": "Typed tool registry", "sub": "schemas, timeouts" },
+        { "id": "read", "label": "Read tools", "sub": "logs, metrics, deploys" },
+        { "id": "write", "label": "Change tools", "sub": "restart, scale, rollback" }
+      ]},
+      { "title": "Control", "nodes": [
+        { "id": "approve", "label": "Approval gate" },
+        { "id": "idem", "label": "Idempotency store" },
+        { "id": "history", "label": "Execution history" }
+      ]},
+      { "title": "Output", "nodes": [
+        { "id": "report", "label": "Incident report" },
+        { "id": "evals", "label": "Scenario eval suite" }
+      ]}
+    ],
+    "edges": [
+      ["alert", "sm"], ["op", "sm"],
+      ["sm", "policy"], ["policy", "registry"], ["guard", "sm"],
+      ["registry", "read"], ["registry", "write"],
+      ["read", "guard"],
+      ["write", "approve"], ["write", "idem"],
+      ["read", "history"], ["approve", "history"],
+      ["history", "report"], ["history", "evals"]
+    ],
+    "zones": [
+      { "label": "Production boundary: change tools execute only after approval", "from": 2, "to": 3 }
+    ]
+  },
+  "architectureNotes": [
+    "The model chooses among allowed transitions and tools for the current state; it cannot invent a tool or skip the approval state.",
+    "Tool results are wrapped and labelled as untrusted content before they return to the model.",
+    "Change tools require an approval record and an idempotency key; a retried call with the same key returns the first result.",
+    "History is stored per step so a run can be resumed after a crash or replayed for evaluation."
+  ],
+  "aiTechnique": {
+    "choice": "A language model for reasoning inside an explicit state machine with typed tool calling.",
+    "rationale": "Diagnosis benefits from a model that reads varied logs and metrics, but control flow, permissions, and failure handling must be deterministic. The state machine provides the structure; the model fills in judgment within each state.",
+    "rejected": [
+      { "option": "Open-ended ReAct loop", "reason": "Unbounded steps, hard to test, and no structural place to enforce approval." },
+      { "option": "Pure scripted runbooks", "reason": "Reliable but brittle when incidents vary from the script." }
+    ]
+  },
+  "implementation": [
+    { "area": "Orchestration", "detail": "Explicit states and allowed transitions; step and token budgets per run." },
+    { "area": "Tools", "detail": "Pydantic input and output schemas, per-tool timeout, retry policy, and permission tier; tools also exposed over MCP." },
+    { "area": "Reliability", "detail": "Exponential backoff with a retry cap, idempotency keys on change tools, and resumable runs." },
+    { "area": "Security", "detail": "Least-privilege credentials per tool, untrusted-content tagging, and an allow-list of change targets." },
+    { "area": "Persistence", "detail": "PostgreSQL tables for runs, steps, tool calls, and approvals." },
+    { "area": "Observability", "detail": "OpenTelemetry spans per state and tool call." },
+    { "area": "Testing", "detail": "Unit tests on transitions, a state-machine test proving change tools cannot run without approval, and scenario replays." }
+  ],
+  "evaluation": {
+    "datasets": [
+      "Simulated incident scenarios with known root causes and correct actions",
+      "Adversarial scenarios with injected instructions in log and ticket text",
+      "Fault-injection scenarios: tool timeouts, partial failures, duplicate deliveries"
+    ],
+    "baselines": ["Same model in an open-ended tool loop without the state machine"],
+    "metrics": [
+      { "name": "Task success rate", "status": "target", "target": "Correct diagnosis and proposed action per scenario", "result": null, "dataset": "Simulated incident scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Open-ended tool loop", "method": "Compare final report and proposal to the scenario answer key", "limitation": null },
+      { "name": "Unapproved write actions", "status": "target", "target": "Zero across all scenarios", "result": null, "dataset": "All scenarios including adversarial", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Open-ended tool loop", "method": "Count change-tool executions without an approval record", "limitation": null },
+      { "name": "Injection resistance", "status": "target", "target": "Share of adversarial scenarios where injected instructions are not followed", "result": null, "dataset": "Adversarial scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "No untrusted-content tagging", "method": "Check tool-call trace for actions requested only by injected text", "limitation": null },
+      { "name": "Duplicate side effects", "status": "target", "target": "Zero under retried and duplicated calls", "result": null, "dataset": "Fault-injection scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "No idempotency keys", "method": "Count change effects per idempotency key", "limitation": null }
+    ],
+    "regression": [
+      "The approval-required state-machine test runs on every commit",
+      "Scenario suite rerun on any prompt, model, or tool change"
+    ],
+    "failureAnalysis": ["Failed scenarios classified as wrong diagnosis, wrong tool, budget exhaustion, or tool failure"]
+  },
+  "humanControl": [
+    { "control": "Approval gate", "detail": "Change tools pause the run until an authorized person approves or rejects." },
+    { "control": "Tool permissions", "detail": "Each tool has a permission tier and allowed targets set by the platform team." },
+    { "control": "Budgets", "detail": "Step, time, and token limits end runaway runs and escalate to a person." },
+    { "control": "Execution history", "detail": "Every step is persisted for audit, replay, and post-incident review." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "Zero unapproved write actions across the scenario suite",
+      "Higher task success and fewer wasted tool calls than the open-ended baseline"
+    ]
+  },
+  "limitations": [
+    "Scenarios are simulated; real incidents are messier and more varied.",
+    "Injection defenses reduce but do not eliminate prompt-injection risk.",
+    "Has not been run against a live production environment.",
+    "Diagnosis quality depends on the model version and the tools registered."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "cd operations-agent",
+      "cp .env.example .env",
+      "docker compose up -d --build",
+      "docker compose exec agent pytest tests/state_machine",
+      "docker compose exec agent python -m evaluation.run_scenarios"
+    ],
+    "testData": "Scenario definitions in evaluation/scenarios with simulated logs, metrics, and deploy history.",
+    "credentials": "A local approver account in .env.example; approvals are given through the CLI or the review endpoint.",
+    "expectedOutput": "A scenario report with success, approvals requested, blocked actions, and per-step traces.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "tests", "label": "Approval-required state-machine test", "url": null },
+    { "kind": "diagram", "label": "State and tool diagram", "url": null },
+    { "kind": "report", "label": "Scenario evaluation report", "url": null },
+    { "kind": "package", "label": "Downloadable package", "url": null }
+  ],
+  "capabilities": [
+    { "name": "Explicit state-machine orchestration", "status": "implemented" },
+    { "name": "Typed tools", "status": "unconfirmed" },
+    { "name": "Retries, timeouts, and idempotency", "status": "unconfirmed" },
+    { "name": "Tool permissions", "status": "unconfirmed" },
+    { "name": "Prompt-injection defenses", "status": "unconfirmed" },
+    { "name": "Human approval", "status": "implemented" },
+    { "name": "Persistent execution history", "status": "unconfirmed" },
+    { "name": "Incident evaluation and reporting", "status": "planned" }
+  ],
+  "lifecycle": { "data": "medium", "ai": "strong", "evaluation": "strong", "operations": "strong", "governance": "strong" }
+}

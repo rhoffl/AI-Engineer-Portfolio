@@ -1,0 +1,166 @@
+{
+  "slug": "uav-cyber-copilot",
+  "order": 5,
+  "title": "Multimodal UAV Cybersecurity Copilot",
+  "shortTitle": "UAV Cyber Copilot",
+  "summary": "A research and simulation environment that fuses MAVLink telemetry, network sensor events, STIX 2.1 threat intelligence, mission logs, manuals, and imagery into evidence-backed investigations mapped to ATT&CK.",
+  "primaryMessage": "I combine doctoral UAV cybersecurity research with applied AI, threat intelligence, streaming data, and multimodal reasoning.",
+  "status": "unconfirmed",
+  "featured": true,
+  "notice": "Research and simulation environment. Not a flight-safety-certified product, not for operational flight decisions, and all attacks are simulated.",
+  "categories": ["security", "rag", "agents", "data"],
+  "technologies": ["MAVLink", "ArduPilot / PX4 SITL", "Suricata", "Zeek", "STIX 2.1", "MITRE ATT&CK", "Kafka / Redpanda", "Neo4j", "GraphRAG", "Vision-language model", "Python"],
+  "sourceArchive": null,
+  "diagramFile": null,
+
+  "executive": {
+    "problem": "When a drone behaves oddly, an analyst must correlate flight telemetry, network alerts, threat intelligence, mission logs, and imagery by hand. That takes time, and the evidence is easy to miss.",
+    "approach": "A copilot that streams telemetry and network events, detects suspicious patterns, links them to threat intelligence and ATT&CK techniques in a knowledge graph, and drafts an investigation where every claim points to its evidence.",
+    "impact": "Analysts start from a correlated, cited timeline instead of five separate tools. The environment injects simulated attacks so detection and investigation quality can be measured.",
+    "whyItMatters": "This is the differentiating project: doctoral-level UAV security research joined with streaming data, knowledge graphs, and multimodal AI, presented with the limits of a research environment."
+  },
+
+  "problem": "UAV attacks such as GPS spoofing, command injection over MAVLink, telemetry jamming, and ground-station compromise leave traces in different places: flight telemetry, network traffic, and mission records. Threat intelligence about them is scattered and rarely expressed in a form tools can reason over. Analysts need correlation and explanation, and researchers need a repeatable environment to test detection methods.",
+  "users": [
+    "Security analysts investigating UAV incidents in a lab or range",
+    "Cybersecurity researchers testing detection methods",
+    "Threat-intelligence analysts modelling UAV-specific adversary behavior"
+  ],
+  "constraints": [
+    { "kind": "Safety scope", "detail": "Simulation only. Outputs are investigative aids, never flight-control commands." },
+    { "kind": "Evidence", "detail": "Every statement in an investigation must cite a telemetry window, sensor event, intelligence object, document passage, or frame." },
+    { "kind": "Latency", "detail": "Streaming detection keeps up with telemetry rates in the simulator." },
+    { "kind": "Data handling", "detail": "Uses public or synthetic data; no operational mission data." }
+  ],
+  "architecture": {
+    "columns": [
+      { "title": "Inputs", "nodes": [
+        { "id": "mav", "label": "MAVLink telemetry", "sub": "SITL" },
+        { "id": "ids", "label": "Suricata / Zeek events" },
+        { "id": "stix", "label": "STIX 2.1 intel feeds" },
+        { "id": "docs", "label": "Mission logs & manuals" },
+        { "id": "img", "label": "Images / video frames" }
+      ]},
+      { "title": "Streaming", "nodes": [
+        { "id": "bus", "label": "Event stream", "sub": "Kafka / Redpanda" },
+        { "id": "detect", "label": "Detectors", "sub": "rules + anomaly models" },
+        { "id": "attack", "label": "Attack injector", "sub": "simulated" }
+      ]},
+      { "title": "Knowledge", "nodes": [
+        { "id": "graph", "label": "Threat graph", "sub": "STIX + ATT&CK" },
+        { "id": "vec", "label": "Document & frame index" },
+        { "id": "evid", "label": "Evidence store" }
+      ]},
+      { "title": "Reasoning", "nodes": [
+        { "id": "grag", "label": "GraphRAG retriever" },
+        { "id": "vlm", "label": "Multimodal model" },
+        { "id": "inv", "label": "Investigation agent", "sub": "bounded steps" }
+      ]},
+      { "title": "Analyst", "nodes": [
+        { "id": "ws", "label": "Investigation workspace" },
+        { "id": "rep", "label": "Cited incident report" }
+      ]}
+    ],
+    "edges": [
+      ["mav", "bus"], ["ids", "bus"], ["attack", "bus"],
+      ["bus", "detect"], ["detect", "evid"],
+      ["stix", "graph"], ["docs", "vec"], ["img", "vec"],
+      ["detect", "graph"],
+      ["graph", "grag"], ["vec", "grag"], ["vec", "vlm"], ["evid", "inv"],
+      ["grag", "inv"], ["vlm", "inv"],
+      ["inv", "ws"], ["ws", "rep"]
+    ],
+    "zones": [
+      { "label": "Simulation environment: SITL flight stack and simulated attacks", "from": 0, "to": 1 }
+    ]
+  },
+  "architectureNotes": [
+    "Telemetry and network events share one stream so detectors can correlate across sources on a common clock.",
+    "Detections become graph nodes linked to STIX indicators, UAV-specific attack patterns, and ATT&CK techniques.",
+    "The investigation agent retrieves from the graph and indexes, then writes findings that each carry evidence IDs the analyst can open.",
+    "The attack injector records ground truth so every simulated incident can be scored."
+  ],
+  "aiTechnique": {
+    "choice": "Streaming detection plus GraphRAG and a multimodal model inside a bounded investigation agent.",
+    "rationale": "Attacks are relational: a spoofed position, a network alert, and an intelligence report matter together. A knowledge graph captures those relations and GraphRAG retrieves connected evidence. Imagery and manuals need a multimodal model. Detection itself stays in rules and anomaly models so it is fast and testable.",
+    "rejected": [
+      { "option": "Plain vector RAG", "reason": "Loses the relationships between indicators, techniques, and observed events." },
+      { "option": "LLM-only detection", "reason": "Too slow and inconsistent for streaming telemetry." }
+    ]
+  },
+  "implementation": [
+    { "area": "Simulation", "detail": "ArduPilot or PX4 SITL with a ground station; scripted attack scenarios such as GPS spoofing and MAVLink command injection." },
+    { "area": "Sensors", "detail": "Suricata and Zeek on the simulated network, with custom rules for MAVLink traffic." },
+    { "area": "Streaming", "detail": "Kafka-compatible stream with detectors for telemetry physics checks, command anomalies, and sensor alerts." },
+    { "area": "Threat intelligence", "detail": "STIX 2.1 objects with custom extensions for UAV assets and observables, mapped to ATT&CK techniques." },
+    { "area": "Knowledge graph", "detail": "Neo4j graph of assets, observables, indicators, techniques, and detections." },
+    { "area": "Investigation", "detail": "Bounded agent with graph, index, and evidence tools; output schema requires evidence IDs per finding." },
+    { "area": "Containers", "detail": "docker-compose stack for simulator, sensors, stream, graph, and services." }
+  ],
+  "evaluation": {
+    "datasets": ["Scripted attack scenarios with injector ground truth", "Benign flight scenarios for false-positive measurement"],
+    "baselines": ["Rule alerts without correlation", "Vector RAG investigation without the graph"],
+    "metrics": [
+      { "name": "Detection rate by attack type", "status": "target", "target": "Per scenario type", "result": null, "dataset": "Scripted attack scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Uncorrelated rule alerts", "method": "Match detections to injector ground truth within a time window", "limitation": null },
+      { "name": "False positives per flight hour", "status": "target", "target": "On benign scenarios", "result": null, "dataset": "Benign flight scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Uncorrelated rule alerts", "method": "Count alerts on flights with no injected attack", "limitation": null },
+      { "name": "Technique mapping accuracy", "status": "target", "target": "Share of incidents mapped to the correct ATT&CK technique", "result": null, "dataset": "Scripted attack scenarios", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Vector RAG without graph", "method": "Compare mapped technique to scenario label", "limitation": null },
+      { "name": "Evidence-supported findings", "status": "target", "target": "Share of report findings whose cited evidence supports them", "result": null, "dataset": "Generated investigation reports", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Vector RAG without graph", "method": "Reviewer check of each finding against cited evidence", "limitation": null },
+      { "name": "Investigation time", "status": "target", "target": "Analyst time to a correct root cause, with and without the copilot", "result": null, "dataset": "Timed analyst study", "modelVersion": null, "hardware": null, "testDate": null, "sampleSize": null, "baseline": "Manual investigation", "method": "Controlled timed study", "limitation": "Unverified until measured" }
+    ],
+    "regression": ["Scenario suite reruns on detector, graph schema, or model change", "Report schema test: findings without evidence IDs fail"],
+    "failureAnalysis": ["Missed attacks reviewed by telemetry signature", "Wrong technique mappings reviewed against graph coverage"]
+  },
+  "humanControl": [
+    { "control": "Analyst decides", "detail": "The copilot drafts findings; the analyst confirms, edits, or rejects each one." },
+    { "control": "Evidence links", "detail": "Every finding opens to the raw telemetry window, event, intel object, passage, or frame." },
+    { "control": "No control path", "detail": "The system has no interface to send commands to a vehicle." },
+    { "control": "Scope labelling", "detail": "Reports carry a simulation-environment label." }
+  ],
+  "results": {
+    "measured": [],
+    "expected": [
+      "Higher technique-mapping accuracy with the graph than with vector retrieval alone",
+      "Reduced investigation time, unverified until a timed study is run"
+    ]
+  },
+  "limitations": [
+    "Simulation only; not validated on real vehicles, real RF environments, or operational networks.",
+    "Not a flight-safety-certified product and must not inform flight decisions.",
+    "Scripted attacks cover a limited set of techniques.",
+    "Investigation-time benefit is unverified until measured."
+  ],
+  "reproduction": {
+    "verified": false,
+    "setup": [
+      "cd uav-cyber-copilot",
+      "cp .env.example .env",
+      "docker compose up -d --build",
+      "docker compose exec sim ./scenarios/run.sh gps_spoofing",
+      "docker compose exec copilot python -m investigate --latest"
+    ],
+    "testData": "Scenario scripts, public ATT&CK data, sample STIX bundles, and public manufacturer documentation references.",
+    "credentials": "Local analyst account in .env.example.",
+    "expectedOutput": "Detections on the stream, a graph subgraph for the incident, and a cited investigation report.",
+    "teardown": ["docker compose down -v"]
+  },
+  "evidence": [
+    { "kind": "source", "label": "Source repository", "url": null },
+    { "kind": "diagram", "label": "Architecture and threat-intel model", "url": null },
+    { "kind": "report", "label": "Technical report", "url": null },
+    { "kind": "demo", "label": "Simulated attack walkthrough", "url": null },
+    { "kind": "package", "label": "Downloadable package", "url": null }
+  ],
+  "capabilities": [
+    { "name": "MAVLink telemetry", "status": "unconfirmed" },
+    { "name": "Suricata or Zeek events", "status": "unconfirmed" },
+    { "name": "STIX 2.1 threat intelligence", "status": "unconfirmed" },
+    { "name": "Mission logs and equipment manuals", "status": "unconfirmed" },
+    { "name": "Images or video frames", "status": "unconfirmed" },
+    { "name": "ATT&CK mappings", "status": "unconfirmed" },
+    { "name": "Streaming detection", "status": "unconfirmed" },
+    { "name": "GraphRAG", "status": "unconfirmed" },
+    { "name": "Evidence-backed investigation", "status": "unconfirmed" },
+    { "name": "Simulated cyberattacks", "status": "unconfirmed" }
+  ],
+  "lifecycle": { "data": "strong", "ai": "strong", "evaluation": "strong", "operations": "strong", "governance": "strong" }
+}
