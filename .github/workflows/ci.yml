@@ -1,0 +1,62 @@
+name: Portfolio CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Content accuracy (draft gaps are warnings)
+        run: npm run validate
+      - name: Build
+        run: npm run build
+      - name: Regenerate manifest and ledger
+        run: npm run manifest && git diff --exit-code portfolio/ || (echo "Run npm run manifest and commit the result" && exit 1)
+      - run: npx playwright install --with-deps chromium
+      - name: Accessibility, mobile overflow and internal-link checks
+        run: npm run check:a11y
+      - name: External link check
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --no-progress src/content/**/*.json README.md
+          fail: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: dist/
+
+  deploy:
+    # Publishes to GitHub Pages only when the content passes publish-mode validation.
+    needs: check
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Publish gate (fails while any draft gap remains)
+        run: npm run validate:publish
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+      - id: deploy
+        uses: actions/deploy-pages@v4
