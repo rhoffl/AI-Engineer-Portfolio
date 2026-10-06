@@ -18,7 +18,7 @@
   "links": {
     "email": null,
     "linkedin": null,
-    "github": null,
+    "github": "https://github.com/rhoffl/AI-Engineer-Portfolio",
     "resume": null
   },
   "strongestProjects": ["enterprise-rag", "operations-agent", "uav-cyber-copilot"],
